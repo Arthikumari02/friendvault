@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="700" viewBox="0 0 900 700" role="img" aria-label="Goa Trip memory photo">
+  <defs>
+    <linearGradient id="bg" x1="0" x2="1" y1="0" y2="1">
+      <stop offset="0" stop-color="#bae6fd"/>
+      <stop offset=".55" stop-color="#c7d2fe"/>
+      <stop offset="1" stop-color="#fde68a"/>
+    </linearGradient>
+    <filter id="grain"><feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="2" stitchTiles="stitch"/><feColorMatrix type="saturate" values="0"/><feComponentTransfer><feFuncA type="table" tableValues="0 .08"/></feComponentTransfer></filter>
+  </defs>
+  <rect width="900" height="700" fill="url(#bg)"/>
+  <circle cx="145" cy="105" r="110" fill="#fff" opacity=".32"/>
+  <circle cx="755" cy="540" r="180" fill="#fff" opacity=".22"/>
+  <g transform="translate(130 120) scale(1)"><circle cx="430" cy="110" r="58" fill="#fbbf24" opacity=".82"/><path d="M0 320 C120 250 230 285 340 225 C455 162 555 210 640 160 L640 420 L0 420 Z" fill="#2563eb" opacity=".24"/><path d="M0 360 C160 300 315 340 470 278 C540 250 594 250 640 265 L640 420 L0 420 Z" fill="#0f172a" opacity=".22"/></g>
+  <path d="M90 560 C230 500 375 610 520 545 C640 492 735 515 820 470" fill="none" stroke="#fff" stroke-width="18" stroke-linecap="round" opacity=".36"/>
+  <rect width="900" height="700" filter="url(#grain)" opacity=".45"/>
+</svg>

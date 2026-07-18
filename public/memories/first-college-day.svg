@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="700" viewBox="0 0 900 700" role="img" aria-label="First College Day memory photo">
+  <defs>
+    <linearGradient id="bg" x1="0" x2="1" y1="0" y2="1">
+      <stop offset="0" stop-color="#ddd6fe"/>
+      <stop offset=".55" stop-color="#bfdbfe"/>
+      <stop offset="1" stop-color="#fef3c7"/>
+    </linearGradient>
+    <filter id="grain"><feTurbulence type="fractalNoise" baseFrequency="0.85" numOctaves="2" stitchTiles="stitch"/><feColorMatrix type="saturate" values="0"/><feComponentTransfer><feFuncA type="table" tableValues="0 .08"/></feComponentTransfer></filter>
+  </defs>
+  <rect width="900" height="700" fill="url(#bg)"/>
+  <circle cx="150" cy="120" r="130" fill="#fff" opacity=".28"/>
+  <circle cx="760" cy="530" r="190" fill="#fff" opacity=".22"/>
+  <g transform="translate(125 105)"><rect x="175" y="160" width="300" height="220" rx="22" fill="#f8fafc" opacity=".76"/><path d="M210 210 h230 M210 260 h180 M210 310 h210" stroke="#4f46e5" stroke-width="16" stroke-linecap="round" opacity=".65"/><circle cx="520" cy="200" r="70" fill="#f59e0b" opacity=".55"/><path d="M145 430 c120-80 245-80 370 0" stroke="#312e81" stroke-width="24" stroke-linecap="round" opacity=".38"/></g>
+  <path d="M90 560 C230 505 365 610 520 545 C635 495 745 520 825 470" fill="none" stroke="#fff" stroke-width="18" stroke-linecap="round" opacity=".34"/>
+  <rect width="900" height="700" filter="url(#grain)" opacity=".45"/>
+</svg>

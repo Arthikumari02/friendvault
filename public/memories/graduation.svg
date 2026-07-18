@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="700" viewBox="0 0 900 700" role="img" aria-label="Graduation memory photo">
+  <defs>
+    <linearGradient id="bg" x1="0" x2="1" y1="0" y2="1">
+      <stop offset="0" stop-color="#fde68a"/>
+      <stop offset=".55" stop-color="#ffffff"/>
+      <stop offset="1" stop-color="#c7d2fe"/>
+    </linearGradient>
+    <filter id="grain"><feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="2" stitchTiles="stitch"/><feColorMatrix type="saturate" values="0"/><feComponentTransfer><feFuncA type="table" tableValues="0 .08"/></feComponentTransfer></filter>
+  </defs>
+  <rect width="900" height="700" fill="url(#bg)"/>
+  <circle cx="145" cy="105" r="110" fill="#fff" opacity=".32"/>
+  <circle cx="755" cy="540" r="180" fill="#fff" opacity=".22"/>
+  <g transform="translate(130 120) scale(1)"><path d="M320 115 L505 205 L320 295 L135 205 Z" fill="#312e81" opacity=".82"/><path d="M220 245 v72 c65 56 136 56 200 0 v-72" fill="#4f46e5" opacity=".75"/><path d="M505 205 v120" stroke="#92400e" stroke-width="10" stroke-linecap="round"/><circle cx="505" cy="340" r="18" fill="#fbbf24"/><path d="M170 360 c95-46 207-46 300 0" stroke="#f8fafc" stroke-width="18" stroke-linecap="round" opacity=".75"/></g>
+  <path d="M90 560 C230 500 375 610 520 545 C640 492 735 515 820 470" fill="none" stroke="#fff" stroke-width="18" stroke-linecap="round" opacity=".36"/>
+  <rect width="900" height="700" filter="url(#grain)" opacity=".45"/>
+</svg>
