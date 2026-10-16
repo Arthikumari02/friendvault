@@ -215,7 +215,7 @@ export default function Home() {
                 The archive should feel full from the first glance.
               </h2>
             </div>
-            <Button href="/dashboard" variant="warm">
+            <Button href="/demo" variant="warm">
               Open Demo Vaults
             </Button>
           </div>

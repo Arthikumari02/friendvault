@@ -13,15 +13,17 @@ function groupByYear(memories: MemoryWithUser[]) {
 export function Timeline({
   memories,
   groupId,
+  showAddAction = true,
 }: {
   memories: MemoryWithUser[];
   groupId: string;
+  showAddAction?: boolean;
 }) {
   if (memories.length === 0) {
     return (
       <EmptyState
-        actionHref={`/groups/${groupId}/memories/create`}
-        actionLabel="Add Memory"
+        actionHref={showAddAction ? `/groups/${groupId}/memories/create` : undefined}
+        actionLabel={showAddAction ? "Add Memory" : undefined}
         description="Start the timeline with a photo, a story, or a small moment everyone still quotes."
         title="No memories yet"
       />

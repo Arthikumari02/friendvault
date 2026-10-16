@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { getAuthErrorMessage, useAuth } from "@/context/AuthContext";
 import { hasFirebaseConfig } from "@/firebase/config";
 import { isValidEmail } from "@/utils/validation";
+import type { ConfirmationResult } from "firebase/auth";
 
 function ProviderButton({
   icon,
@@ -45,12 +46,24 @@ export function LoginForm() {
     login,
     signup,
     loginWithGoogle,
+    loginWithApple,
+    sendPhoneCode,
+    confirmPhoneCode,
+    sendEmailLink,
+    isEmailLink,
+    completeEmailLink,
     sendPasswordReset,
   } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
-  const [isGoogleLoading, setIsGoogleLoading] = useState(false);
+  const [providerLoading, setProviderLoading] = useState<string | null>(null);
+  const [phoneOpen, setPhoneOpen] = useState(false);
+  const [phone, setPhone] = useState("");
+  const [phoneCode, setPhoneCode] = useState("");
+  const [phoneConfirmation, setPhoneConfirmation] = useState<ConfirmationResult | null>(null);
+  const [emailLinkPending, setEmailLinkPending] = useState(false);
+  const emailLinkAttempted = useRef(false);
   const [authMode, setAuthMode] = useState<"login" | "signup" | "reset" | null>(null);
   const [authMessage, setAuthMessage] = useState("");
   const [authMessageType, setAuthMessageType] = useState<"error" | "success">("error");
@@ -66,6 +79,26 @@ export function LoginForm() {
       router.replace("/dashboard");
     }
   }, [isAuthLoading, router, user]);
+
+  useEffect(() => {
+    if (!isEmailLink(window.location.href) || emailLinkAttempted.current) return;
+    emailLinkAttempted.current = true;
+    const savedEmail = window.localStorage.getItem("friendvaultEmailForSignIn");
+    if (!savedEmail) {
+      queueMicrotask(() => setEmailLinkPending(true));
+      return;
+    }
+    void completeEmailLink(savedEmail, window.location.href)
+      .then(() => {
+        window.localStorage.removeItem("friendvaultEmailForSignIn");
+        router.replace("/dashboard");
+      })
+      .catch((error: unknown) => {
+        setEmailLinkPending(true);
+        setErrorMessage(getAuthErrorMessage(error));
+      })
+      .finally(() => setProviderLoading(null));
+  }, [completeEmailLink, isEmailLink, router]);
 
   function setErrorMessage(message: string) {
     setAuthMessageType("error");
@@ -130,17 +163,79 @@ export function LoginForm() {
     }
   }
 
-  async function handleGoogleSignIn() {
+  async function handlePopupSignIn(provider: "Google" | "Apple") {
     setAuthMessage("");
-    setIsGoogleLoading(true);
+    setPhoneOpen(false);
+    setProviderLoading(provider);
 
     try {
-      await loginWithGoogle();
+      if (provider === "Google") await loginWithGoogle();
+      else await loginWithApple();
       router.push("/dashboard");
     } catch (error) {
       setErrorMessage(getAuthErrorMessage(error));
     } finally {
-      setIsGoogleLoading(false);
+      setProviderLoading(null);
+    }
+  }
+
+  async function handleSendPhoneCode() {
+    setAuthMessage("");
+    if (!/^\+[1-9]\d{7,14}$/.test(phone.trim())) {
+      setErrorMessage("Enter a phone number with country code, such as +15551234567.");
+      return;
+    }
+    setProviderLoading("phone");
+    try {
+      const container = document.getElementById("phone-recaptcha");
+      if (!container) throw new Error("Phone verification is unavailable. Reload the page and try again.");
+      const confirmation = await sendPhoneCode(phone.trim(), container);
+      setPhoneConfirmation(confirmation);
+      setSuccessMessage("Verification code sent. Check your phone.");
+    } catch (error) {
+      setErrorMessage(getAuthErrorMessage(error));
+    } finally {
+      setProviderLoading(null);
+    }
+  }
+
+  async function handleConfirmPhoneCode() {
+    setAuthMessage("");
+    setProviderLoading("phone");
+    try {
+      if (!phoneConfirmation) throw new Error("Request a verification code first.");
+      await confirmPhoneCode(phoneConfirmation, phoneCode.trim());
+      router.push("/dashboard");
+    } catch (error) {
+      setErrorMessage(getAuthErrorMessage(error));
+    } finally {
+      setProviderLoading(null);
+    }
+  }
+
+  async function handleEmailLink() {
+    setAuthMessage("");
+    setPhoneOpen(false);
+    if (!isValidEmail(email.trim())) {
+      setErrors((current) => ({ ...current, email: "Enter a valid email." }));
+      return;
+    }
+    setErrors((current) => ({ ...current, email: undefined }));
+    setProviderLoading("emailLink");
+    try {
+      if (isEmailLink(window.location.href)) {
+        await completeEmailLink(email.trim(), window.location.href);
+        window.localStorage.removeItem("friendvaultEmailForSignIn");
+        router.replace("/dashboard");
+      } else {
+        await sendEmailLink(email.trim());
+        window.localStorage.setItem("friendvaultEmailForSignIn", email.trim());
+        setSuccessMessage("Sign-in link sent. Check your inbox and open the link to finish signing in.");
+      }
+    } catch (error) {
+      setErrorMessage(getAuthErrorMessage(error));
+    } finally {
+      setProviderLoading(null);
     }
   }
 
@@ -162,32 +257,55 @@ export function LoginForm() {
         </p>
       </div>
 
-      {!hasFirebaseConfig ? (
-        <div className="-mx-8 mt-6 bg-amber-700 px-8 py-3 text-sm leading-6 text-white sm:-mx-12 sm:px-12">
-          Add Firebase values to .env.local, enable Email/Password authentication, then restart the dev server.
-        </div>
-      ) : authMessage ? (
+      {authMessage ? (
         <div
+          role="alert"
           className={`-mx-8 mt-6 px-8 py-3 text-sm leading-6 text-white sm:-mx-12 sm:px-12 ${
             authMessageType === "success" ? "bg-emerald-700" : "bg-red-700"
           }`}
         >
           {authMessage}
         </div>
+      ) : !hasFirebaseConfig ? (
+        <div className="-mx-8 mt-6 bg-amber-700 px-8 py-3 text-sm leading-6 text-white sm:-mx-12 sm:px-12">
+          Firebase is not configured. Copy .env.local.example to .env.local, add your Firebase Web App values, enable the sign-in providers, and restart the dev server.
+        </div>
+      ) : null}
+
+      {emailLinkPending ? (
+        <p className="mt-5 text-sm text-slate-300">
+          Enter the email address that received this link, then choose Complete email link sign-in.
+        </p>
       ) : null}
 
       <div className="mt-5 space-y-2.5">
-        <ProviderButton icon="P" label="Continue with Phone Number" onClick={() => setErrorMessage("Phone sign-in is not configured yet.")} />
+        <ProviderButton icon="P" label="Continue with Phone Number" onClick={() => { setAuthMessage(""); setPhoneOpen((open) => !open); }} />
         <ProviderButton
-          disabled={isGoogleLoading || isAuthDisabled}
+          disabled={providerLoading !== null || isSubmitting}
           highlighted
           icon="G"
-          label={isGoogleLoading ? "Opening Google..." : "Continue with Google"}
-          onClick={handleGoogleSignIn}
+          label={providerLoading === "Google" ? "Opening Google..." : "Continue with Google"}
+          onClick={() => void handlePopupSignIn("Google")}
         />
-        <ProviderButton icon="A" label="Continue with Apple" onClick={() => setErrorMessage("Apple sign-in is not configured yet.")} />
-        <ProviderButton icon="L" label="Email me a one-time link" onClick={() => setErrorMessage("Email link sign-in is not configured yet.")} />
+        <ProviderButton disabled={providerLoading !== null || isSubmitting} icon="A" label={providerLoading === "Apple" ? "Opening Apple..." : "Continue with Apple"} onClick={() => void handlePopupSignIn("Apple")} />
+        <ProviderButton disabled={providerLoading !== null || isSubmitting} icon="L" label={emailLinkPending ? "Complete email link sign-in" : "Email me a one-time link"} onClick={() => void handleEmailLink()} />
       </div>
+
+      {phoneOpen ? (
+        <div className="mt-4 space-y-3 rounded-xl border border-white/15 p-4">
+          <label className="block text-sm text-white" htmlFor="phone-number">Phone number with country code</label>
+          <input id="phone-number" autoComplete="tel" className="min-h-11 w-full rounded-lg bg-[#293337] px-3 text-white" onChange={(event) => { setPhone(event.target.value); setPhoneConfirmation(null); }} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); void handleSendPhoneCode(); } }} placeholder="+15551234567" type="tel" value={phone} />
+          <button className="min-h-11 rounded-full bg-blue-500 px-5 text-sm font-semibold text-white disabled:opacity-60" disabled={providerLoading !== null} onClick={() => void handleSendPhoneCode()} type="button">{providerLoading === "phone" ? "Please wait..." : "Send verification code"}</button>
+          {phoneConfirmation ? (
+            <>
+              <label className="block text-sm text-white" htmlFor="phone-code">Verification code</label>
+              <input id="phone-code" autoComplete="one-time-code" className="min-h-11 w-full rounded-lg bg-[#293337] px-3 text-white" onChange={(event) => setPhoneCode(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); void handleConfirmPhoneCode(); } }} inputMode="numeric" value={phoneCode} />
+              <button className="min-h-11 rounded-full bg-blue-500 px-5 text-sm font-semibold text-white disabled:opacity-60" disabled={providerLoading !== null || !phoneCode.trim()} onClick={() => void handleConfirmPhoneCode()} type="button">Verify and sign in</button>
+            </>
+          ) : null}
+          <div id="phone-recaptcha" />
+        </div>
+      ) : null}
 
       <div className="my-6 flex items-center gap-4 text-xs uppercase tracking-wide text-slate-400">
         <span className="h-px flex-1 bg-white/10" />

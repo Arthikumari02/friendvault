@@ -1,0 +1,49 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /groups/{groupId} {
+      function signedIn() {
+        return request.auth != null;
+      }
+
+      function validGroup() {
+        let data = request.resource.data;
+        return data.keys().hasAll([
+            'name', 'description', 'coverImage', 'createdBy', 'createdAt'
+          ])
+          && data.keys().hasOnly([
+            'name', 'description', 'coverImage', 'createdBy', 'createdAt'
+          ])
+          && data.name is string
+          && data.name.size() > 0
+          && data.name.size() <= 100
+          && data.description is string
+          && data.description.size() <= 2000
+          && data.coverImage is string
+          && data.coverImage.size() <= 200
+          && data.createdAt is string
+          && data.createdAt.size() > 0
+          && data.createdAt.size() <= 40;
+      }
+
+      allow create: if signedIn()
+        && validGroup()
+        && request.resource.data.createdBy == request.auth.uid;
+
+      allow get, list: if signedIn()
+        && resource.data.createdBy == request.auth.uid;
+
+      allow update: if signedIn()
+        && resource.data.createdBy == request.auth.uid
+        && validGroup()
+        && request.resource.data.createdBy == resource.data.createdBy
+        && request.resource.data.createdAt == resource.data.createdAt
+        && request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(['name', 'description', 'coverImage']);
+
+      allow delete: if signedIn()
+        && resource.data.createdBy == request.auth.uid;
+    }
+  }
+}

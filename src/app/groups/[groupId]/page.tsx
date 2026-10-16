@@ -1,30 +1,75 @@
+"use client";
+
+import { useEffect, useState } from "react";
 import Image from "next/image";
-import { notFound } from "next/navigation";
+import { useParams } from "next/navigation";
 import { AvatarStack } from "@/components/AvatarStack";
 import { Button } from "@/components/Button";
 import { Timeline } from "@/components/Timeline";
 import { getGroupAvatars, getGroupById, getGroupMemberCount } from "@/services/groups";
 import { getMemoriesForGroup } from "@/services/memories";
+import { useAuth } from "@/context/AuthContext";
+import { getGroupErrorMessage, getUserGroup } from "@/services/userGroups";
+import type { Group, MemoryWithUser } from "@/types";
 import { formatDate } from "@/utils/date";
 
-export default async function GroupDetailsPage({
-  params,
-}: {
-  params: Promise<{ groupId: string }>;
-}) {
-  const { groupId } = await params;
-  const [group, memberCount, avatars, memories] = await Promise.all([
-    getGroupById(groupId),
-    getGroupMemberCount(groupId),
-    getGroupAvatars(groupId),
-    getMemoriesForGroup(groupId),
-  ]);
+type Details = {
+  group: Group | null;
+  memberCount: number;
+  avatars: string[];
+  memories: MemoryWithUser[];
+  isSample: boolean;
+  error: string;
+};
 
-  if (!group) notFound();
+export default function GroupDetailsPage() {
+  const { groupId } = useParams<{ groupId: string }>();
+  const { user, isAuthLoading } = useAuth();
+  const [result, setResult] = useState<{ groupId: string; details: Details } | null>(null);
+
+  useEffect(() => {
+    if (isAuthLoading) return;
+    let active = true;
+    async function loadGroup(): Promise<Details> {
+      const sample = await getGroupById(groupId);
+      if (sample) {
+        const [memberCount, avatars, memories] = await Promise.all([
+          getGroupMemberCount(groupId),
+          getGroupAvatars(groupId),
+          getMemoriesForGroup(groupId),
+        ]);
+        return { group: sample, memberCount, avatars, memories, isSample: true, error: "" };
+      }
+      if (!user) return { group: null, memberCount: 0, avatars: [], memories: [], isSample: false, error: "Sign in to view this group." };
+      const group = await getUserGroup(groupId);
+      return {
+        group,
+        memberCount: group ? 1 : 0,
+        avatars: group ? [user.initials ?? "FR"] : [],
+        memories: [],
+        isSample: false,
+        error: "",
+      };
+    }
+    void loadGroup()
+      .then((details) => { if (active) setResult({ groupId, details }); })
+      .catch((error: unknown) => {
+        if (active) setResult({ groupId, details: { group: null, memberCount: 0, avatars: [], memories: [], isSample: false, error: getGroupErrorMessage(error) } });
+      });
+    return () => { active = false; };
+  }, [groupId, isAuthLoading, user]);
+
+  if (isAuthLoading || result?.groupId !== groupId) {
+    return <p className="mx-auto max-w-6xl px-4 py-10 text-sm text-slate-600">Loading group...</p>;
+  }
+
+  const { group, memberCount, avatars, memories, isSample, error } = result.details;
+  if (error) return <p role="alert" className="mx-auto max-w-6xl px-4 py-10 text-sm text-rose-700">{error}</p>;
+  if (!group) return <p className="mx-auto max-w-6xl px-4 py-10 text-sm text-slate-600">Group not found.</p>;
 
   const latest = memories[0];
   const yearsTogether = Math.max(
-    1,
+    0,
     new Date().getFullYear() - new Date(group.createdAt).getFullYear(),
   );
 
@@ -46,6 +91,7 @@ export default async function GroupDetailsPage({
           <div className="absolute bottom-5 left-5 right-5 flex flex-col gap-5 rounded-[2rem] bg-white/88 p-5 shadow-xl backdrop-blur lg:flex-row lg:items-end lg:justify-between">
             <div>
               <AvatarStack avatars={avatars} />
+              {isSample ? <p className="mt-4 text-sm font-semibold uppercase tracking-[0.18em] text-indigo-600">Demo vault</p> : null}
               <p className="mt-5 text-sm font-semibold uppercase tracking-[0.18em] text-indigo-600">
                 {memberCount} friends - {yearsTogether} years together - created {formatDate(group.createdAt)}
               </p>
@@ -58,9 +104,6 @@ export default async function GroupDetailsPage({
             </div>
             <div className="flex flex-col gap-3 sm:flex-row">
               <Button variant="secondary">Invite Friend</Button>
-              <Button href={`/groups/${group.id}/memories/create`} variant="warm">
-                Add Memory
-              </Button>
             </div>
           </div>
         </div>
@@ -77,7 +120,7 @@ export default async function GroupDetailsPage({
             Every year gets its own shelf. Every card is a story your friends can come back to.
           </p>
         </div>
-        <Timeline groupId={group.id} memories={memories} />
+        <Timeline groupId={group.id} memories={memories} showAddAction={false} />
       </div>
     </section>
   );

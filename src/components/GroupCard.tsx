@@ -57,12 +57,12 @@ export function GroupCard({ group }: { group: GroupSummary }) {
           <div className="mt-6">
             <p className="text-sm font-bold text-slate-950">Recent activity</p>
             <div className="mt-3 space-y-3">
-              {["Goa Trip", "Birthday Surprise", "Chai After Exam"].map((item) => (
-                <div className="flex items-center gap-3 rounded-2xl bg-slate-50 px-4 py-3" key={item}>
+              {recent ? (
+                <div className="flex items-center gap-3 rounded-2xl bg-slate-50 px-4 py-3">
                   <span className="h-2.5 w-2.5 rounded-full bg-amber-300 ring-4 ring-amber-100" />
-                  <span className="text-sm font-semibold text-slate-700">Photo · {item}</span>
+                  <span className="text-sm font-semibold text-slate-700">Photo · {recent.title}</span>
                 </div>
-              ))}
+              ) : <p className="text-sm text-slate-500">No activity yet.</p>}
             </div>
           </div>
           <Button className="mt-7 w-full" href={`/groups/${group.id}`} variant="warm">

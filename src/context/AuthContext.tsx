@@ -13,11 +13,18 @@ import { FirebaseError } from "firebase/app";
 import {
   createUserWithEmailAndPassword,
   GoogleAuthProvider,
+  isSignInWithEmailLink,
   onAuthStateChanged,
+  OAuthProvider,
+  RecaptchaVerifier,
   sendPasswordResetEmail,
+  sendSignInLinkToEmail,
   signInWithEmailAndPassword,
+  signInWithEmailLink,
+  signInWithPhoneNumber,
   signInWithPopup,
   signOut,
+  type ConfirmationResult,
   type User as FirebaseUser,
 } from "firebase/auth";
 import { auth } from "@/firebase/config";
@@ -30,6 +37,12 @@ type AuthContextValue = {
   login: (email: string, password: string) => Promise<void>;
   signup: (email: string, password: string) => Promise<void>;
   loginWithGoogle: () => Promise<void>;
+  loginWithApple: () => Promise<void>;
+  sendPhoneCode: (phone: string, container: HTMLElement) => Promise<ConfirmationResult>;
+  confirmPhoneCode: (confirmation: ConfirmationResult, code: string) => Promise<void>;
+  sendEmailLink: (email: string) => Promise<void>;
+  isEmailLink: (url: string) => boolean;
+  completeEmailLink: (email: string, url: string) => Promise<void>;
   sendPasswordReset: (email: string) => Promise<void>;
   logout: () => Promise<void>;
 };
@@ -51,7 +64,7 @@ function getInitials(nameOrEmail: string) {
 function requireAuth() {
   if (!auth) {
     throw new Error(
-      "Firebase environment variables are required before email and Google sign-in can be used.",
+      "Firebase configuration is missing. Add the NEXT_PUBLIC_FIREBASE values to .env.local and restart the server.",
     );
   }
 
@@ -94,7 +107,21 @@ export function getAuthErrorMessage(error: unknown) {
     case "auth/too-many-requests":
       return "Too many attempts. Wait a moment and try again.";
     case "auth/operation-not-allowed":
-      return "Enable the Email/Password sign-in provider in Firebase Authentication.";
+      return "This sign-in method is not enabled in Firebase Authentication.";
+    case "auth/unauthorized-domain":
+      return "Add this site's domain to Firebase Authentication authorized domains.";
+    case "auth/popup-blocked":
+      return "Your browser blocked the sign-in popup. Allow popups and try again.";
+    case "auth/popup-closed-by-user":
+      return "The sign-in popup was closed before sign-in finished.";
+    case "auth/invalid-phone-number":
+      return "Enter a phone number with country code, such as +15551234567.";
+    case "auth/invalid-verification-code":
+      return "The verification code is incorrect. Try again.";
+    case "auth/code-expired":
+      return "The verification code expired. Request a new code.";
+    case "auth/invalid-email":
+      return "Enter a valid email address.";
     default:
       return error.message;
   }
@@ -143,6 +170,43 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(toAppUser(result.user));
   }, []);
 
+  const loginWithApple = useCallback(async () => {
+    const firebaseAuth = requireAuth();
+    const result = await signInWithPopup(firebaseAuth, new OAuthProvider("apple.com"));
+    setUser(toAppUser(result.user));
+  }, []);
+
+  const sendPhoneCode = useCallback(async (phone: string, container: HTMLElement) => {
+    const firebaseAuth = requireAuth();
+    const verifier = new RecaptchaVerifier(firebaseAuth, container, { size: "normal" });
+    try {
+      return await signInWithPhoneNumber(firebaseAuth, phone, verifier);
+    } finally {
+      verifier.clear();
+    }
+  }, []);
+
+  const confirmPhoneCode = useCallback(async (confirmation: ConfirmationResult, code: string) => {
+    const result = await confirmation.confirm(code);
+    setUser(toAppUser(result.user));
+  }, []);
+
+  const sendEmailLink = useCallback(async (email: string) => {
+    const firebaseAuth = requireAuth();
+    await sendSignInLinkToEmail(firebaseAuth, email, {
+      url: `${window.location.origin}/login`,
+      handleCodeInApp: true,
+    });
+  }, []);
+
+  const isEmailLink = useCallback((url: string) => Boolean(auth && isSignInWithEmailLink(auth, url)), []);
+
+  const completeEmailLink = useCallback(async (email: string, url: string) => {
+    const firebaseAuth = requireAuth();
+    const result = await signInWithEmailLink(firebaseAuth, email, url);
+    setUser(toAppUser(result.user));
+  }, []);
+
   const sendPasswordReset = useCallback(async (email: string) => {
     const firebaseAuth = requireAuth();
     await sendPasswordResetEmail(firebaseAuth, email);
@@ -160,6 +224,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       isAuthLoading,
       login,
       loginWithGoogle,
+      loginWithApple,
+      sendPhoneCode,
+      confirmPhoneCode,
+      sendEmailLink,
+      isEmailLink,
+      completeEmailLink,
       logout,
       sendPasswordReset,
       signup,
@@ -168,6 +238,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       isAuthLoading,
       login,
       loginWithGoogle,
+      loginWithApple,
+      sendPhoneCode,
+      confirmPhoneCode,
+      sendEmailLink,
+      isEmailLink,
+      completeEmailLink,
       logout,
       sendPasswordReset,
       signup,
