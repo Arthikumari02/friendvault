@@ -13,6 +13,7 @@ export type Group = {
   description: string;
   coverImage?: string;
   coverCaption?: string;
+  inviteCode?: string;
   createdBy: string;
   createdAt: string;
 };
@@ -21,6 +22,15 @@ export type GroupMember = {
   groupId: string;
   userId: string;
   role: "owner" | "admin" | "member";
+  displayName: string;
+  joinedAt: string;
+};
+
+export type GroupInvitation = {
+  groupId: string;
+  inviteeId: string;
+  invitedBy: string;
+  createdAt: string;
 };
 
 export type Memory = {
@@ -29,6 +39,8 @@ export type Memory = {
   title: string;
   description: string;
   imageUrl?: string;
+  imagePath?: string;
+  photos?: import("@/features/memories/utils/memoryPhotos").MemoryPhoto[];
   imageTone?: string;
   location?: string;
   uploadedBy: string;

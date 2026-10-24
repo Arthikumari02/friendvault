@@ -33,9 +33,24 @@ Enable the Cloud Firestore API and create a Cloud Firestore database in the same
 ## Verification
 
 ```bash
+npm test
 npm run lint
+npx tsc --noEmit
 npm run build
 ```
+
+## Frontend structure
+
+FriendVault is a single Next.js app. Files in `src/app` define routes and API handlers; page files render feature controllers or views. Feature code lives in `src/features/<feature>`:
+
+- `controllers/` connects routes, authentication, data loading, and navigation.
+- `components/` renders feature UI from props or local presentation state.
+- `hooks/` owns reusable stateful behavior, such as authenticated photo loading.
+- `apis/` contains Firebase and photo service adapters.
+- `utils/` contains feature validation and pure transformations.
+- `contexts/` and `runtime/` hold feature context and transient runtime state where needed.
+
+Shared UI primitives remain in `src/components`, cross-feature types in `src/types`, Firebase setup in `src/firebase`, and server-only photo authorization in `src/server`. The CrimeOS guide's Nx, React Router, Apollo, and MobX commands do not apply to this Next.js workspace.
 # friendvault
 # friendvault
 # friendvault

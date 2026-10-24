@@ -1,0 +1,35 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    match /profiles/{userId}/avatar {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && request.auth.uid == userId
+        && request.resource.size <= 5 * 1024 * 1024
+        && request.resource.contentType.matches('image/(jpeg|png|webp)');
+    }
+    match /groups/{groupId}/memories/{memoryId}/{imageId} {
+      function group() {
+        return firestore.get(/databases/(default)/documents/groups/$(groupId));
+      }
+      function permitted() {
+        return request.auth != null && (
+          group().data.createdBy == request.auth.uid ||
+          firestore.exists(/databases/(default)/documents/groups/$(groupId)/members/$(request.auth.uid))
+        );
+      }
+      allow read: if permitted() && imageId.matches('image(-[A-Za-z0-9-]+)?');
+      allow create: if permitted() && imageId.matches('image(-[A-Za-z0-9-]+)?')
+        && request.resource.size <= 10 * 1024 * 1024
+        && request.resource.contentType.matches('image/(jpeg|png|webp|gif)')
+        && request.resource.metadata.groupOwner == group().data.createdBy
+        && request.resource.metadata.uploadedBy == request.auth.uid
+        && request.resource.metadata.memoryAuthor is string
+        && request.resource.metadata.memoryAuthor.size() > 0;
+      allow update: if false;
+      allow delete: if request.auth != null && imageId.matches('image(-[A-Za-z0-9-]+)?')
+        && ((resource.metadata.keys().hasAll(['groupOwner']) && resource.metadata.groupOwner == request.auth.uid)
+          || (permitted() && (group().data.createdBy == request.auth.uid
+            || (resource.metadata.keys().hasAll(['memoryAuthor']) && resource.metadata.memoryAuthor == request.auth.uid))));
+    }
+  }
+}

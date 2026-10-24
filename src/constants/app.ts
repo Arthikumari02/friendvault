@@ -2,7 +2,7 @@ export const APP_NAME = "FriendVault";
 export const APP_TAGLINE = "Never lose the story of your friendships.";
 
 export const navLinks = [
-  { href: "/", label: "Memories" },
+  { href: "/memories", label: "Memories" },
   { href: "/dashboard", label: "Vaults" },
   { href: "/login", label: "Sign in" },
 ];

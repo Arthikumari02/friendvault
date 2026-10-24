@@ -2,48 +2,149 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
+    function signedIn() { return request.auth != null; }
+    function groupPath(groupId) { return /databases/$(database)/documents/groups/$(groupId); }
+    function owner(groupId) {
+      return signedIn() && get(groupPath(groupId)).data.createdBy == request.auth.uid;
+    }
+    function member(groupId) {
+      return signedIn() && exists(/databases/$(database)/documents/groups/$(groupId)/members/$(request.auth.uid));
+    }
+    function canRead(groupId) { return owner(groupId) || member(groupId); }
+    function canInvite(groupId) {
+      return owner(groupId) || (member(groupId) && get(/databases/$(database)/documents/groups/$(groupId)/members/$(request.auth.uid)).data.role == 'admin');
+    }
+    function validDate(value) { return value is string && value.size() >= 10 && value.size() <= 40; }
+    function validMemoryDate(value) {
+      return value is string && value.matches('[0-9]{4}-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])');
+    }
+
     match /groups/{groupId} {
-      function signedIn() {
-        return request.auth != null;
-      }
-
       function validGroup() {
-        let data = request.resource.data;
-        return data.keys().hasAll([
-            'name', 'description', 'coverImage', 'createdBy', 'createdAt'
-          ])
-          && data.keys().hasOnly([
-            'name', 'description', 'coverImage', 'createdBy', 'createdAt'
-          ])
-          && data.name is string
-          && data.name.size() > 0
-          && data.name.size() <= 100
-          && data.description is string
-          && data.description.size() <= 2000
-          && data.coverImage is string
-          && data.coverImage.size() <= 200
-          && data.createdAt is string
-          && data.createdAt.size() > 0
-          && data.createdAt.size() <= 40;
+        let d = request.resource.data;
+        return d.keys().hasAll(['name', 'description', 'coverImage', 'createdBy', 'createdAt'])
+          && d.keys().hasOnly(['name', 'description', 'coverImage', 'createdBy', 'createdAt', 'inviteCode'])
+          && d.name is string && d.name.size() > 0 && d.name.size() <= 100
+          && d.description is string && d.description.size() <= 2000
+          && d.coverImage is string && d.coverImage.size() <= 200
+          && d.createdBy is string && validDate(d.createdAt)
+          && (d.get('inviteCode', '') == '' || (d.get('inviteCode', '') is string && d.get('inviteCode', '').matches('[A-HJ-NP-Z2-9]{8}')));
       }
-
-      allow create: if signedIn()
-        && validGroup()
-        && request.resource.data.createdBy == request.auth.uid;
-
-      allow get, list: if signedIn()
-        && resource.data.createdBy == request.auth.uid;
-
-      allow update: if signedIn()
-        && resource.data.createdBy == request.auth.uid
-        && validGroup()
+      allow create: if signedIn() && validGroup() && request.resource.data.createdBy == request.auth.uid;
+      allow get, list: if signedIn() && (resource.data.createdBy == request.auth.uid || member(groupId));
+      allow update: if owner(groupId) && validGroup()
         && request.resource.data.createdBy == resource.data.createdBy
         && request.resource.data.createdAt == resource.data.createdAt
-        && request.resource.data.diff(resource.data).affectedKeys()
-          .hasOnly(['name', 'description', 'coverImage']);
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name', 'description', 'coverImage', 'inviteCode']);
+      allow delete: if signedIn() && resource.data.createdBy == request.auth.uid;
 
-      allow delete: if signedIn()
-        && resource.data.createdBy == request.auth.uid;
+      match /members/{memberId} {
+        function validMember() {
+          let d = request.resource.data;
+          return d.keys().hasAll(['userId', 'groupId', 'role', 'displayName', 'joinedAt'])
+            && d.keys().hasOnly(['userId', 'groupId', 'role', 'displayName', 'joinedAt', 'joinCode'])
+            && d.userId == memberId && d.groupId == groupId
+            && d.role in ['member', 'admin']
+            && d.displayName is string && d.displayName.size() > 0 && d.displayName.size() <= 100
+            && validDate(d.joinedAt)
+            && (d.get('joinCode', '') == '' || (d.get('joinCode', '') is string && d.get('joinCode', '').matches('[A-HJ-NP-Z2-9]{8}')));
+        }
+        allow get, list: if canRead(groupId);
+        allow create: if signedIn() && memberId == request.auth.uid
+          && validMember() && request.resource.data.role == 'member'
+          && (((request.resource.data.get('joinCode', '') == '')
+            && exists(/databases/$(database)/documents/groups/$(groupId)/invitations/$(memberId))
+            && get(/databases/$(database)/documents/groups/$(groupId)/invitations/$(memberId)).data.inviteeId == memberId)
+            || (request.resource.data.get('joinCode', '') != ''
+              && get(groupPath(groupId)).data.get('inviteCode', '') == request.resource.data.joinCode
+              && exists(/databases/$(database)/documents/joinCodes/$(request.resource.data.joinCode))
+              && get(/databases/$(database)/documents/joinCodes/$(request.resource.data.joinCode)).data.groupId == groupId))
+          && !owner(groupId);
+        allow update: if owner(groupId) && validMember()
+          && request.resource.data.userId == resource.data.userId
+          && request.resource.data.groupId == resource.data.groupId
+          && request.resource.data.displayName == resource.data.displayName
+          && request.resource.data.joinedAt == resource.data.joinedAt
+          && request.resource.data.get('joinCode', '') == resource.data.get('joinCode', '');
+        allow delete: if owner(groupId) || (signedIn() && memberId == request.auth.uid);
+      }
+
+      match /invitations/{inviteeId} {
+        function validInvitation() {
+          let d = request.resource.data;
+          return d.keys().hasAll(['inviteeId', 'invitedBy', 'createdAt'])
+            && d.keys().hasOnly(['inviteeId', 'invitedBy', 'createdAt'])
+            && d.inviteeId == inviteeId && d.invitedBy == request.auth.uid
+            && validDate(d.createdAt) && inviteeId != request.auth.uid
+            && !exists(/databases/$(database)/documents/groups/$(groupId)/members/$(inviteeId))
+            && get(groupPath(groupId)).data.createdBy != inviteeId;
+        }
+        allow get: if signedIn() && (inviteeId == request.auth.uid || canInvite(groupId));
+        allow list: if canInvite(groupId);
+        allow create, update: if canInvite(groupId) && validInvitation();
+        allow delete: if signedIn() && (inviteeId == request.auth.uid || canInvite(groupId));
+      }
+
+      match /memories/{memoryId} {
+        function validMemory() {
+          let d = request.resource.data;
+          return d.keys().hasAll(['title', 'description', 'memoryDate', 'location', 'imagePath', 'uploadedBy', 'uploadedByName', 'createdAt'])
+            && d.keys().hasOnly(['title', 'description', 'memoryDate', 'location', 'imagePath', 'photos', 'uploadedBy', 'uploadedByName', 'createdAt'])
+            && d.title is string && d.title.size() > 0 && d.title.size() <= 150
+            && d.description is string && d.description.size() > 0 && d.description.size() <= 5000
+            && validMemoryDate(d.memoryDate) && validDate(d.createdAt)
+            && d.location is string && d.location.size() <= 150
+            && d.imagePath is string && (d.imagePath == '' || d.imagePath.matches('groups/' + groupId + '/memories/' + memoryId + '/image(-[A-Za-z0-9-]+)?'))
+            && d.get('photos', []) is list && d.get('photos', []).size() <= 12
+            && d.uploadedByName is string && d.uploadedByName.size() > 0 && d.uploadedByName.size() <= 100;
+        }
+        allow get, list: if canRead(groupId);
+        allow create: if canRead(groupId) && validMemory() && request.resource.data.uploadedBy == request.auth.uid;
+        allow update: if canRead(groupId) && validMemory()
+          && (owner(groupId) || resource.data.uploadedBy == request.auth.uid)
+          && request.resource.data.uploadedBy == resource.data.uploadedBy
+          && request.resource.data.uploadedByName == resource.data.uploadedByName
+          && request.resource.data.createdAt == resource.data.createdAt
+          && request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(['title', 'description', 'memoryDate', 'location', 'imagePath', 'photos']);
+        allow delete: if owner(groupId) || (member(groupId) && resource.data.uploadedBy == request.auth.uid);
+      }
+    }
+
+    match /joinCodes/{code} {
+      allow get: if signedIn() && code.matches('[A-HJ-NP-Z2-9]{8}');
+      allow list: if false;
+      allow create: if signedIn() && code.matches('[A-HJ-NP-Z2-9]{8}')
+        && request.resource.data.keys().hasAll(['groupId', 'createdBy'])
+        && request.resource.data.keys().hasOnly(['groupId', 'createdBy'])
+        && request.resource.data.groupId is string
+        && request.resource.data.createdBy == request.auth.uid
+        && getAfter(groupPath(request.resource.data.groupId)).data.createdBy == request.auth.uid
+        && getAfter(groupPath(request.resource.data.groupId)).data.inviteCode == code;
+      allow update: if false;
+      allow delete: if signedIn() && resource.data.createdBy == request.auth.uid
+        && get(groupPath(resource.data.groupId)).data.createdBy == request.auth.uid;
+    }
+
+    // A vault's photo cleanup can continue after its group document is gone.
+    match /vaultDeletionJobs/{groupId} {
+      allow create: if signedIn()
+        && request.resource.data.keys().hasAll(['ownerId', 'imagePaths'])
+        && request.resource.data.keys().hasOnly(['ownerId', 'imagePaths', 'cloudinaryPublicIds'])
+        && request.resource.data.ownerId == request.auth.uid
+        && request.resource.data.imagePaths is list
+        && request.resource.data.imagePaths.size() <= 400
+        && request.resource.data.get('cloudinaryPublicIds', []) is list
+        && request.resource.data.get('cloudinaryPublicIds', []).size() <= 4800
+        && (request.resource.data.imagePaths.size() > 0 || request.resource.data.get('cloudinaryPublicIds', []).size() > 0)
+        && get(groupPath(groupId)).data.createdBy == request.auth.uid
+        && !existsAfter(groupPath(groupId));
+      allow get, list, delete: if signedIn() && resource.data.ownerId == request.auth.uid;
+      allow update: if false;
+    }
+
+    match /{path=**}/members/{memberId} {
+      allow list: if signedIn() && resource.data.userId == request.auth.uid;
     }
   }
 }

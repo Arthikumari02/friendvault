@@ -62,13 +62,13 @@ export const mockGroups: Group[] = [
 ];
 
 export const mockGroupMembers: GroupMember[] = [
-  { groupId: "college-circle", userId: "user-1", role: "owner" },
-  { groupId: "college-circle", userId: "user-2", role: "admin" },
-  { groupId: "college-circle", userId: "user-3", role: "member" },
-  { groupId: "college-circle", userId: "user-4", role: "member" },
-  { groupId: "goa-crew", userId: "user-1", role: "member" },
-  { groupId: "goa-crew", userId: "user-2", role: "owner" },
-  { groupId: "goa-crew", userId: "user-4", role: "member" },
+  { groupId: "college-circle", userId: "user-1", role: "owner", displayName: "Friend", joinedAt: "2022-01-01T00:00:00.000Z" },
+  { groupId: "college-circle", userId: "user-2", role: "admin", displayName: "Friend", joinedAt: "2022-01-01T00:00:00.000Z" },
+  { groupId: "college-circle", userId: "user-3", role: "member", displayName: "Friend", joinedAt: "2022-01-01T00:00:00.000Z" },
+  { groupId: "college-circle", userId: "user-4", role: "member", displayName: "Friend", joinedAt: "2022-01-01T00:00:00.000Z" },
+  { groupId: "goa-crew", userId: "user-1", role: "member", displayName: "Friend", joinedAt: "2022-01-01T00:00:00.000Z" },
+  { groupId: "goa-crew", userId: "user-2", role: "owner", displayName: "Friend", joinedAt: "2022-01-01T00:00:00.000Z" },
+  { groupId: "goa-crew", userId: "user-4", role: "member", displayName: "Friend", joinedAt: "2022-01-01T00:00:00.000Z" },
 ];
 
 export const mockMemories: Memory[] = [

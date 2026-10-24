@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { validateGroup } from "../src/features/groups/validateGroup.ts";
+import { validateGroup } from "../src/features/groups/utils/validateGroup.ts";
 
 test("accepts trimmed names at the limit and descriptions at the limit", () => {
   assert.deepEqual(validateGroup(`  ${"a".repeat(100)}  `, "d".repeat(2000)), {

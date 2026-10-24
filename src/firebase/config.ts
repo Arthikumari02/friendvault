@@ -12,7 +12,10 @@ const firebaseConfig = {
   appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
 };
 
-const hasFirebaseConfig = Object.values(firebaseConfig).every(Boolean);
+const hasFirebaseConfig = Boolean(
+  firebaseConfig.apiKey && firebaseConfig.authDomain && firebaseConfig.projectId &&
+  firebaseConfig.messagingSenderId && firebaseConfig.appId,
+);
 
 export function getFirebaseApp(): FirebaseApp | null {
   if (!hasFirebaseConfig) return null;
@@ -24,5 +27,5 @@ const app = getFirebaseApp();
 
 export const auth = app ? getAuth(app) : null;
 export const db = app ? getFirestore(app) : null;
-export const storage = app ? getStorage(app) : null;
+export const storage = app && firebaseConfig.storageBucket ? getStorage(app) : null;
 export { hasFirebaseConfig };
